@@ -1,0 +1,204 @@
+---
+title: "Assessment"
+format: html
+---
+
+
+```{r}
+```
+
+
+```{r}
+data <- read.csv(file.path("C:\\Users\\Kalpitha\\OneDrive\\Desktop\\Assignments'25\\Applied analytics\\soft-attributes.csv"))
+head(data)
+missing_text_entries <- nchar(data$less_than)==0
+sum(missing_text_entries)
+
+#removing the missing data from the less_than column 
+data_cleaned <- subset(data, less_than != "" & more_than != "" & about_as != "" )
+
+
+# Verifying  removal
+sum(nchar(data_cleaned$less_than) == 0)
+sum(nchar(data_cleaned$more_than) == 0) 
+sum(nchar(data_cleaned$about_as) == 0)  
+
+install.packages(c("dplyr", "stringr"))
+
+#importing necessary packages 
+library(dplyr)
+library(stringr)
+library(ggplot2)
+library(tidyr)
+
+#seperating the release year of the reference movies 
+data <- data_cleaned %>%
+  mutate(release_year = str_extract(reference_title, "\\((\\d{4})\\)")) %>%
+  mutate(release_year = as.numeric(str_remove_all(release_year, "[()]")))
+
+# Print first few rows to verify
+head(data)
+
+
+# analysis- Understanding the timeline demographic of the soft attributes that appear more frequently
+
+
+#step1.counting the top 3 soft attributes
+
+popular_attribute_counts <- data_cleaned %>%
+  group_by(soft_attribute) %>%
+  count() %>%  # Count occurrences of each soft_attribute
+  rename(popular_attributes = n) %>%
+  arrange(desc(popular_attributes), ) %>%  # Sort in descending order based on count
+  head(3)  # Select top 3 attributes
+
+# View the top 3 attributes
+print(popular_attribute_counts)
+
+
+
+# Filter the dataset for only the top 3 soft attributes
+top_attributes_data <- data_cleaned %>%
+  filter(soft_attribute %in% popular_attribute_counts$soft_attribute) %>%
+  group_by(release_year, soft_attribute) %>%
+  summarise(count = n(), .groups = "drop")  # Count occurrences per year
+
+# Plot popular attributes over time
+ggplot(top_attributes_data, aes(x = release_year, y = count, color = soft_attribute, group = soft_attribute)) +
+  geom_line(size = 1) +  # Line plot for trends
+  geom_point(size = 2) +  # Add points for better clarity
+  labs(title = "Trends of Popular Attributes Over Time",
+       x = "Release Year", y = "Count of Movies",
+       color = "Soft Attribute") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis for readability
+
+#understanding the review trends in soft attribute before 1980
+before_1980 <- data_cleaned %>%
+  filter(release_year<1980)%>%
+  group_by(soft_attribute) %>%
+  count() %>%  # Count occurrences of each soft_attribute
+  rename(popular_attributes = n) %>%
+  arrange(desc(popular_attributes), ) %>%  # Sort in descending order based on count
+  head(3)  # Select top 3 attributes
+
+
+print(before_1980)
+
+# Count occurrences of each soft attribute per year
+trend_data_before_1980 <- data_cleaned %>%
+  filter(release_year < 1980) %>%
+  group_by(release_year, soft_attribute) %>%
+  summarise(count = n(), .groups = "drop")  # Count the occurrences
+
+print(head(trend_data_before_1980))  # Check the first few rows
+
+# Get the top 3 soft attributes
+top_attributes <- before_1980$soft_attribute  # Extract top 3 attributes from your previous analysis
+
+# Filter dataset for only the top 3 attributes
+trend_data_top_1980 <- data_cleaned %>%
+  filter(release_year < 1980, soft_attribute %in% top_attributes) %>%
+  group_by(release_year, soft_attribute) %>%
+  summarise(count = n(), .groups = "drop")
+
+print(head(trend_data_top_1980))  # Check the structure
+
+ggplot(trend_data_top_1980, aes(x = release_year, y = count, color = soft_attribute, group = soft_attribute)) +
+  geom_line(size = 1.2) +  # Line plot for trends
+  geom_point(size = 2) +  # Points for visibility
+  theme_minimal() +  # Clean theme
+  labs(title = "Trends of Top 3 Soft Attributes before 1980)",
+       x = "Release Year",
+       y = "Count of Soft Attribute",
+       color = "Soft Attribute") +
+  theme(legend.position = "bottom")  # Move legend to bottom
+
+
+
+# Filter for "big budget" films released during 1970
+big_budget_1970 <- data_cleaned %>%
+  filter(soft_attribute == "big budget", release_year <= 1970) %>%
+  select(reference_title, release_year,more_than)  # Adjust this if you have a date column
+
+print(big_budget_1970)
+
+# Ensure that release_year is in the correct format
+big_budget_1970$release_year <- as.integer(big_budget_1970$release_year)
+
+# Plot the number of big budget films released before 1980, with reference title and count of 
+ggplot(big_budget_1970, aes(x = release_year)) +
+  geom_bar(aes(fill = reference_title), position = "dodge") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(title = "Big Budget Films between 1970 by Reference Title",
+       x = "Release Year", y = "Count of Films") +
+  theme(legend.title = element_blank()) 
+
+#understanding the review trends in soft attribute beyond 1980
+beyond_1980 <- data_cleaned %>%
+  filter(release_year>1980)%>%
+  group_by(soft_attribute) %>%
+  count() %>%  # Count occurrences of each soft_attribute
+  rename(popular_attributes = n) %>%
+  arrange(desc(popular_attributes), ) %>%  # Sort in descending order based on count
+  head(3)  # Select top 3 attributes
+
+  
+print(beyond_1980)
+
+# Count occurrences of each soft attribute per year
+trend_data <- data_cleaned %>%
+  filter(release_year > 1980) %>%
+  group_by(release_year, soft_attribute) %>%
+  summarise(count = n(), .groups = "drop")  # Count the occurrences
+
+print(head(trend_data))  # Check the first few rows
+
+# Get the top 3 soft attributes
+top_attributes <- beyond_1980$soft_attribute  # Extract top 3 attributes from your previous analysis
+
+# Filter dataset for only the top 3 attributes
+trend_data_top <- data_cleaned %>%
+  filter(release_year > 1980, soft_attribute %in% top_attributes) %>%
+  group_by(release_year, soft_attribute) %>%
+  summarise(count = n(), .groups = "drop")
+
+print(head(trend_data_top))  # Check the structure
+
+ggplot(trend_data_top, aes(x = release_year, y = count, color = soft_attribute, group = soft_attribute)) +
+  geom_line(size = 1.2) +  # Line plot for trends
+  geom_point(size = 2) +  # Points for visibility
+  theme_minimal() +  # Clean theme
+  labs(title = "Trends of Top 3 Soft Attributes Over Time (Post-1980)",
+       x = "Release Year",
+       y = "Count of Soft Attribute",
+       color = "Soft Attribute") +
+  theme(legend.position = "bottom")  # Move legend to bottom
+
+# Filter for "unique story" films released after 1990
+unique_story_films_after_1990 <- data_cleaned %>%
+  filter(soft_attribute == "unique story", release_year > 1990) %>%
+  select(reference_title, release_year,more_than)  # Adjust this if you have a date column
+
+print(unique_story_films_after_1990)
+
+#Ensure that release_year is in the correct format
+unique_story_films_after_1990$release_year <- as.integer(unique_story_films_after_1990$release_year)
+
+# Plot the number of big budget films released after 1990, with reference title and count of 
+ggplot(unique_story_films_after_1990, aes(x = release_year)) +
+  geom_line(stat = "count", color = "blue", size = 1.2) +
+  geom_point(stat = "count", color = "red", size = 2) +
+  theme_minimal() +
+  labs(title = "Trend of 'Unique Story' Films After 1990",
+       x = "Release Year", y = "Number of Films")
+```
+
+You can add options to executable code like this 
+
+```{r}
+#| echo: false
+2 * 2
+```
+
+The `echo: false` option disables the printing of code (only output is displayed).
