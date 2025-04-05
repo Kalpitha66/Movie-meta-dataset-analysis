@@ -1,0 +1,432 @@
+---
+title: "Assessment 2- 24243601"
+format: html
+---
+
+
+
+
+
+
+##Loading necessary package
+```{r}
+library(dplyr)
+```
+
+
+
+## Meta dataset from imdb for the year 1970 
+```{r}
+data2 <- read.csv(file.path("C:\\Users\\Kalpitha\\OneDrive\\Desktop\\Assignments'25\\Applied analytics\\Assessment 2\\merged_movies_data_1970.csv"))
+
+head(data2)
+```
+
+
+
+
+## Reading  meta dataset from imdb for the year 1995 
+```{r}
+data3 <- read.csv(file.path("C:\\Users\\Kalpitha\\OneDrive\\Desktop\\Assignments'25\\Applied analytics\\Assessment 2\\merged_movies_data_1995.csv"))
+
+head(data3)
+
+```
+
+## Reading  meta dataset from imdb for the year 2000
+```{r}
+data4 <- read.csv(file.path("C:\\Users\\Kalpitha\\OneDrive\\Desktop\\Assignments'25\\Applied analytics\\Assessment 2\\merged_movies_data_2000.csv"))
+
+head(data4)
+
+
+```
+
+## Reading  meta dataset from imdb for the year 2002
+```{r}
+data5 <- read.csv(file.path("C:\\Users\\Kalpitha\\OneDrive\\Desktop\\Assignments'25\\Applied analytics\\Assessment 2\\merged_movies_data_2002.csv"))
+
+head(data5)
+
+```
+
+
+
+
+
+
+## Combining the datasets by selecting specific columns for analysis
+
+```{r}
+library(dplyr)
+
+
+data2_clean <- data2 %>% select(Title, Year,Rating, Votes,nominations,oscars, filming_locations)
+data3_clean <- data3 %>% select(Title, Year,Rating, Votes,nominations,oscars, filming_locations)
+data4_clean <- data4 %>% select(Title, Year,Rating,  Votes,nominations,oscars,filming_locations)
+data5_clean <- data5 %>% select(Title, Year,Rating,  Votes,nominations,oscars,filming_locations)
+
+
+
+# Combine the cleaned datasets
+analysis_data <- bind_rows(data2_clean, data3_clean, data4_clean, data5_clean)
+
+# View result
+head(analysis_data)
+
+```
+## Mermaid diagram for the stacked represention of the " analysis_data"
+```{r}
+
+library(DiagrammeR)
+```
+```{r}
+grViz("
+digraph G {
+    A [label='Data2\\nTitle, Year, Rating, Votes, filming_locations'];
+    B [label='Data3\\nTitle, Year, Rating, Votes, filming_locations'];
+    C [label='Data4\\nTitle, Year, Rating, Votes, filming_locations'];
+    D [label='Data5\\nTitle, Year, Rating, Votes, filming_locations'];
+    E [label='Concatenate / Stack'];
+    F [label='analysis_data\\nTitle, Year, Rating, Votes, filming_locations'];
+
+    A -> E;
+    B -> E;
+    C -> E;
+    D -> E;
+    E -> F;
+}
+")
+```
+
+
+
+## Understanding the structure of the "analysis_data"
+```{r}
+head(analysis_data)
+str(analysis_data)
+summary(analysis_data)
+```
+## Converting votes to numeric datatype
+```{r}
+convert_votes <- function(votes) {
+  votes <- gsub(",", "", votes)  # Remove commas
+  ifelse(grepl("M", votes),
+         as.numeric(sub("M", "", votes)) * 1e6,
+         ifelse(grepl("K", votes),
+                as.numeric(sub("K", "", votes)) * 1e3,
+                as.numeric(votes)))
+}
+
+analysis_data <- analysis_data %>%
+  mutate(Votes = convert_votes(Votes))
+
+head(analysis_data)
+```
+## Geographical analysis on filming locations
+```{r}
+
+library(leaflet)
+library(tidygeocoder)
+library(readr)
+
+```
+```{r}
+geo_data <- analysis_data %>%
+  filter(!is.na(filming_locations)) %>%
+  distinct(filming_locations, .keep_all = TRUE) %>%
+  slice_head(n = 50)   # Select the first 50 unique filming locations
+
+
+
+```
+
+```{r}
+
+
+geo_data <- geo_data %>%
+  geocode(filming_locations, method = 'osm', lat = latitude, long = longitude)
+
+```
+
+```{r}
+library(leaflet)
+
+leaflet(geo_data) %>%
+  addTiles() %>%
+  addCircleMarkers(
+    lng = ~longitude,
+    lat = ~latitude,
+    popup = ~paste("<b>Title:</b>", Title, "<br>",
+                   "<b>Rating:</b>", Rating, "<br>",
+                   "<b>Votes:</b>", Votes, "<br>",
+                   "<b>Filming Location:</b>", filming_locations),
+    radius = 5,
+    color = "blue",
+    fillOpacity = 0.7
+  ) %>%
+  addLegend("bottomright", colors = "blue", labels = "Filming Locations", opacity = 0.7)
+
+```
+
+
+
+
+## Analysis question- " Algorithm that depicts the movie's successful nomination of a film based on the votes and rating "
+
+# Null Hypothesis - Votes and rating do not significantly predict a movie’s successful nomination.
+
+# Alternative Hypothesis - Votes and/or rating significantly predict a movie’s successful nomination
+
+
+```{r}
+library(gam)
+library(ISLR)
+```
+
+# Taking subset of 100 entries
+```{r}
+subset_data <- analysis_data[1:100,]
+```
+
+# Setting random sample
+```{r}
+set.seed(100)
+```
+
+# Setting testing and training data
+```{r}
+sample_data <- sample(1:100, 70)
+print(sample_data)
+train_data <- subset_data[sample_data,]
+test_data <- subset_data[-sample_data,]
+```
+# Fitting the model
+```{r}
+y <- train_data$Votes
+x <- train_data$Rating
+z <- train_data$Nominated <- ifelse(train_data$nominations > 0, 1, 0)
+
+library(mgcv)
+
+# Fit the logistic GAM
+gam_model <- gam(Nominated ~ s(Votes) + s(Rating), 
+                 data = train_data, 
+                 family = binomial(link = "logit"))
+
+summary(gam_model)
+
+```
+```{r}
+plot(gam_model)
+```
+```{r}
+p1 <- predict(gam_model, newdata = test_data, type = "response")
+p1
+```
+## Visualising the results
+```{r}
+library(ggplot2)
+
+ggplot(test_data, aes(x = p1)) +
+  geom_histogram(binwidth = 0.05, fill = "skyblue", color = "black") +
+  labs(title = "Histogram of Predicted Nomination Probabilities",
+       x = "Predicted Probability",
+       y = "Frequency")
+
+```
+## Votes vs Predicted probability
+```{r}
+ggplot(test_data, aes(x = Votes, y = p1)) +
+  geom_point(color = "blue", alpha = 0.6) +
+  geom_smooth(method = "loess", color = "red") +
+  labs(title = "Votes vs Predicted Nomination Probability",
+       x = "Votes",
+       y = "Predicted Probability")
+
+```
+## Checking the significance of the predictors by understanding the distribution of p-values with the smooth terms
+```{r}
+
+library(mgcv)
+
+```
+```{r}
+plot(gam_model, pages = 1)
+```
+
+
+```{r}
+anova(gam_model, test = "F")
+
+```
+# Hence, Both predictors show statistical significance:
+
+# Votes (p=0.0418) and Rating (p=0.0080) have p-values below the 0.05 threshold, rejecting the null hypothesis.
+
+# This indicates votes and ratings do significantly predict a film’s likelihood of receiving a nomination
+
+## Understanding votes v/s rating distribution using Plotly package
+
+```{r}
+
+library(plotly)
+
+```
+```{r}
+# Filtering data 
+plot_data <- analysis_data %>%
+  filter(!is.na(Rating), !is.na(Votes))
+
+```
+
+```{r}
+plot1 <- plot_ly(
+  data = plot_data,
+  x = ~Votes,
+  y = ~Rating,
+  text = ~paste("Title:", Title, "<br>Year:", Year, "<br>Oscars:", oscars),
+  mode = 'markers',
+  marker = list(size = 10, color = ~Rating, colorscale = 'Viridis', showscale = TRUE)
+) %>%
+  layout(title = "Votes vs Ratings (Colored by Rating)",
+         xaxis = list(title = "Votes"),
+         yaxis = list(title = "IMDb Rating"))
+plot1
+
+```
+
+
+
+
+
+
+## Text mining
+# Analysis overview - Understanding the frequent stars 
+
+```{r}
+library(tm)
+```
+
+
+```{r}
+library(RColorBrewer)
+library(wordcloud)
+
+```
+# Adding additional columns of directors ,filming locations and stars to carry out the analysis
+
+```{r}
+data2_clean <- data2 %>% select(  stars)
+data3_clean <- data3 %>% select(  stars)
+data4_clean <- data4 %>% select(  stars)
+data5_clean <- data5 %>% select(  stars)
+
+```
+
+```{r}
+analysis_data_text <- bind_rows(data2_clean, data3_clean, data4_clean, data5_clean)
+
+head(analysis_data_text %>% select(stars))
+
+
+```
+# unlisting the data
+```{r}
+# Flatten the 'stars' column into a simple vector
+stars_flat <- unlist(analysis_data_text$stars)
+
+# Check the result
+head(stars_flat)
+
+```
+
+# creating corpus
+```{r}
+stars_corpus <- Corpus(VectorSource(stars_flat))
+
+```
+
+# cleaning corpus and pre-processing
+```{r}
+#  Cleaning the corpus (remove punctuation, stopwords, etc.)
+stars_corpus_clean <- tm_map(stars_corpus, content_transformer(tolower))  # Convert to lowercase
+stars_corpus_clean <- tm_map(stars_corpus_clean, removePunctuation)       # Remove punctuation
+stars_corpus_clean <- tm_map(stars_corpus_clean, removeNumbers)           # Remove numbers
+stars_corpus_clean <- tm_map(stars_corpus_clean, removeWords, stopwords("en"))  # Remove common stopwords
+stars_corpus_clean <- tm_map(stars_corpus_clean, stripWhitespace)         # Remove extra whitespace
+
+#  Creating a term-document matrix to get word frequencies
+stars_tdm <- TermDocumentMatrix(stars_corpus_clean)
+
+```
+```{r}
+ # Converting the term-document matrix to a matrix and get the frequency of each word (star)
+stars_matrix <- as.matrix(stars_tdm)
+word_freq <- sort(rowSums(stars_matrix), decreasing = TRUE)
+
+#  Creating a data frame of word frequencies
+word_freq_df <- data.frame(
+  word = names(word_freq),
+  freq = word_freq
+)
+
+# View the word frequencies (top 3)
+head(word_freq_df, 3)
+
+# Create a word cloud
+library(wordcloud)
+wordcloud(
+  words = word_freq_df$word, 
+  freq = word_freq_df$freq, 
+  min.freq = 2,       # Set a minimum frequency for words to appear
+  max.words = 200,    # Limit the number of words shown in the word cloud
+  scale = c(3, 0.5),  # Adjust size scaling of words
+  colors = brewer.pal(8, "Dark2")  # Set the color palette
+)
+
+```
+## References
+ 
+ 1. https://www.geeksforgeeks.org/what-is-inferential-statistics/ 
+ 2. https://www.kaggle.com/datasets/raedaddala/imdb-movies-from-1960-to-2023
+ 3. https://cran.r-project.org/mirrors.html
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
